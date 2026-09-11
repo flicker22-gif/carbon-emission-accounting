@@ -18,8 +18,20 @@
 
 排放量计算公式:`排放量(tCO₂e) = 活动数据 × 排放因子(kgCO₂e/单位) ÷ 1000`
 
-> 排放因子为公开来源缺省值（生态环境部电网因子、IPCC、DEFRA 等），企业应通过
-> `PUT /api/factors/{id}` 更新为所在地区/年度的官方发布值。排放量动态计算，因子更新后报表自动刷新。
+## 排放因子库(版本化 + 自动匹配)
+
+因子按 **能源类型 + 地区 + 适用年度** 三维版本化维护,适应官方因子逐年更新:
+
+- 录入能耗时只需选择**能源类型**,不绑定具体因子
+- 计算时自动匹配:**厂区所在地区因子优先 → 无则回退「全国」兜底;年度取 ≤ 数据期间的最新版本**
+- 因子更新后,历史数据**自动按新因子重算**,无需重录
+- 无适用因子的记录标记为「未匹配」,不计入汇总并在仪表盘提醒
+
+> 预置因子中标注"示例值"的地区因子,请在正式使用前通过因子管理页或
+> `PUT /api/factors/{id}` 替换为官方最新发布值(生态环境部每年发布全国及省级电力因子)。
+
+> ⚠️ 本次升级为表结构变更(因子表加 region/year、记录表存 energy_type)。
+> 已有旧库请删除重建:`rm backend/carbon.db`(SQLite)或 `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`(PG),启动时自动重建并写入种子因子。
 
 ## 快速开始
 
@@ -59,15 +71,16 @@ npm run dev                          # http://localhost:3000
 |---|---|
 | `/` 仪表盘 | 总排放量、范围一/二/三分项、按类别/厂区汇总、导出 CSV |
 | `/records` | 能耗数据录入（厂区 + 能源类型 + 月份 + 消耗量）、记录管理 |
-| `/facilities` | 厂区新增与列表 |
-| `/factors` | 排放因子库查看 |
+| `/facilities` | 厂区新增与列表（含所在地区，用于因子匹配） |
+| `/factors` | 排放因子库管理：按能源类型/地区筛选、新增、编辑、删除 |
 
 ## API 概览
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET/POST | `/api/facilities` | 厂区列表 / 新增 |
-| GET/POST/PUT | `/api/factors` | 排放因子查询 / 新增 / 更新 |
+| GET/POST/PUT/DELETE | `/api/factors` | 因子筛选查询（类型/地区/年度/范围）/ 新增 / 更新 / 删除 |
+| GET | `/api/factors/energy-types` | 能源类型下拉选项（去重） |
 | GET/POST/DELETE | `/api/records` | 能耗记录查询（支持厂区/期间/范围过滤）/ 新增 / 删除 |
 | GET | `/api/reports/summary` | 按范围、类别、厂区的汇总（tCO₂e) |
 | GET | `/api/reports/export.csv` | 导出排放明细 CSV |
@@ -81,6 +94,7 @@ npm run dev                          # http://localhost:3000
 │       ├── main.py            # FastAPI 入口,启动时建表+种子因子
 │       ├── models.py          # Facility / EmissionFactor / EnergyRecord
 │       ├── schemas.py         # Pydantic 模型
+│       ├── services.py        # 因子自动匹配(地区优先+年度最新+全国兜底)
 │       ├── seed_factors.py    # 预置排放因子
 │       └── routers/           # facilities / factors / records / reports
 └── frontend/

@@ -1,25 +1,25 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { api, EmissionFactor, EnergyRecord, Facility } from "@/lib/api";
+import { api, EnergyRecord, EnergyType, Facility } from "@/lib/api";
 
 export default function RecordsPage() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [factors, setFactors] = useState<EmissionFactor[]>([]);
+  const [energyTypes, setEnergyTypes] = useState<EnergyType[]>([]);
   const [records, setRecords] = useState<EnergyRecord[]>([]);
   const [error, setError] = useState("");
 
   const [facilityId, setFacilityId] = useState("");
-  const [factorId, setFactorId] = useState("");
+  const [energyType, setEnergyType] = useState("");
   const [period, setPeriod] = useState("");
   const [consumption, setConsumption] = useState("");
   const [remark, setRemark] = useState("");
 
   const load = () => {
-    Promise.all([api.listFacilities(), api.listFactors(), api.listRecords()])
-      .then(([f, fac, r]) => {
+    Promise.all([api.listFacilities(), api.listEnergyTypes(), api.listRecords()])
+      .then(([f, t, r]) => {
         setFacilities(f);
-        setFactors(fac);
+        setEnergyTypes(t);
         setRecords(r);
       })
       .catch((e) => setError(e.message));
@@ -27,7 +27,8 @@ export default function RecordsPage() {
 
   useEffect(load, []);
 
-  const selectedFactor = factors.find((f) => f.id === Number(factorId));
+  const selectedType = energyTypes.find((t) => t.energy_type === energyType);
+  const selectedFacility = facilities.find((f) => f.id === Number(facilityId));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -35,7 +36,7 @@ export default function RecordsPage() {
     try {
       await api.createRecord({
         facility_id: Number(facilityId),
-        factor_id: Number(factorId),
+        energy_type: energyType,
         period,
         consumption: Number(consumption),
         remark: remark || undefined,
@@ -64,17 +65,17 @@ export default function RecordsPage() {
             <select required value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
               <option value="">请选择</option>
               {facilities.map((f) => (
-                <option key={f.id} value={f.id}>{f.name}</option>
+                <option key={f.id} value={f.id}>{f.name}（{f.region}）</option>
               ))}
             </select>
           </div>
           <div>
             <label>能源类型</label>
-            <select required value={factorId} onChange={(e) => setFactorId(e.target.value)}>
+            <select required value={energyType} onChange={(e) => setEnergyType(e.target.value)}>
               <option value="">请选择</option>
-              {factors.map((f) => (
-                <option key={f.id} value={f.id}>
-                  [范围{f.scope}] {f.name_zh}（{f.unit}）
+              {energyTypes.map((t) => (
+                <option key={t.energy_type} value={t.energy_type}>
+                  [范围{t.scope}] {t.name_zh}（{t.unit}）
                 </option>
               ))}
             </select>
@@ -84,7 +85,7 @@ export default function RecordsPage() {
             <input required type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
           </div>
           <div>
-            <label>消耗量{selectedFactor ? `（${selectedFactor.unit}）` : ""}</label>
+            <label>消耗量{selectedType ? `（${selectedType.unit}）` : ""}</label>
             <input
               required type="number" min="0" step="any" value={consumption}
               onChange={(e) => setConsumption(e.target.value)}
@@ -98,10 +99,9 @@ export default function RecordsPage() {
             <button type="submit">保存记录</button>
           </div>
         </form>
-        {selectedFactor && (
+        {selectedType && selectedFacility && (
           <p className="muted" style={{ marginBottom: 0 }}>
-            当前因子：{selectedFactor.factor_value} kgCO₂e/{selectedFactor.unit}
-            {selectedFactor.source ? `（来源：${selectedFactor.source}）` : ""}
+            将按「{selectedFacility.region} → 全国」优先、年度 ≤ 数据期间最新的规则自动匹配排放因子。
           </p>
         )}
         {error && <p className="error">{error}</p>}
@@ -113,7 +113,7 @@ export default function RecordsPage() {
           <thead>
             <tr>
               <th>期间</th><th>厂区</th><th>范围</th><th>能源</th>
-              <th>消耗量</th><th>排放量 (tCO₂e)</th><th></th>
+              <th>消耗量</th><th>匹配因子</th><th>排放量 (tCO₂e)</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -121,17 +121,26 @@ export default function RecordsPage() {
               <tr key={r.id}>
                 <td>{r.period}</td>
                 <td>{r.facility_name}</td>
-                <td><span className={`badge s${r.scope}`}>范围{r.scope}</span></td>
-                <td>{r.factor_name}</td>
-                <td>{r.consumption.toLocaleString()} {r.unit}</td>
-                <td>{r.emissions_tco2e.toLocaleString()}</td>
+                <td>
+                  {r.scope
+                    ? <span className={`badge s${r.scope}`}>范围{r.scope}</span>
+                    : <span className="badge" style={{ background: "#fee2e2", color: "#b91c1c" }}>未匹配</span>}
+                </td>
+                <td>{r.factor_name ?? r.energy_type}</td>
+                <td>{r.consumption.toLocaleString()} {r.unit ?? ""}</td>
+                <td className="muted">
+                  {r.matched
+                    ? `${r.factor_value} kgCO₂e/${r.unit}（${r.factor_region} ${r.factor_year}）`
+                    : "因子库无适用因子"}
+                </td>
+                <td>{r.emissions_tco2e != null ? r.emissions_tco2e.toLocaleString() : "-"}</td>
                 <td>
                   <button className="danger" onClick={() => remove(r.id)}>删除</button>
                 </td>
               </tr>
             ))}
             {records.length === 0 && (
-              <tr><td colSpan={7} className="muted">暂无记录</td></tr>
+              <tr><td colSpan={8} className="muted">暂无记录</td></tr>
             )}
           </tbody>
         </table>

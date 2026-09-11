@@ -26,6 +26,11 @@ export default function Dashboard() {
   return (
     <>
       <h1>排放总览</h1>
+      {data.unmatched_records > 0 && (
+        <p className="error">
+          ⚠️ 有 {data.unmatched_records} 条记录未匹配到适用排放因子,未计入汇总。请在「排放因子」中补充对应地区/年度的因子。
+        </p>
+      )}
       <div className="stat-grid">
         <div className="stat total">
           <div className="label">总排放量 (tCO₂e)</div>

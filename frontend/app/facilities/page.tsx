@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { api, Facility } from "@/lib/api";
+import { api, Facility, REGIONS } from "@/lib/api";
 
 export default function FacilitiesPage() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [region, setRegion] = useState("全国");
   const [location, setLocation] = useState("");
   const [industry, setIndustry] = useState("");
   const [error, setError] = useState("");
@@ -19,11 +20,11 @@ export default function FacilitiesPage() {
     setError("");
     try {
       await api.createFacility({
-        name, code,
+        name, code, region,
         location: location || null,
         industry: industry || null,
       });
-      setName(""); setCode(""); setLocation(""); setIndustry("");
+      setName(""); setCode(""); setRegion("全国"); setLocation(""); setIndustry("");
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "提交失败");
@@ -44,6 +45,12 @@ export default function FacilitiesPage() {
             <input required value={code} onChange={(e) => setCode(e.target.value)} />
           </div>
           <div>
+            <label>所在地区(用于匹配地区因子)</label>
+            <select value={region} onChange={(e) => setRegion(e.target.value)}>
+              {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
             <label>所在地</label>
             <input value={location} onChange={(e) => setLocation(e.target.value)} />
           </div>
@@ -61,19 +68,20 @@ export default function FacilitiesPage() {
       <div className="card">
         <table>
           <thead>
-            <tr><th>编码</th><th>名称</th><th>所在地</th><th>行业</th></tr>
+            <tr><th>编码</th><th>名称</th><th>地区</th><th>所在地</th><th>行业</th></tr>
           </thead>
           <tbody>
             {facilities.map((f) => (
               <tr key={f.id}>
                 <td>{f.code}</td>
                 <td>{f.name}</td>
+                <td>{f.region}</td>
                 <td>{f.location ?? "-"}</td>
                 <td>{f.industry ?? "-"}</td>
               </tr>
             ))}
             {facilities.length === 0 && (
-              <tr><td colSpan={4} className="muted">暂无厂区，请先新增</td></tr>
+              <tr><td colSpan={5} className="muted">暂无厂区，请先新增</td></tr>
             )}
           </tbody>
         </table>
