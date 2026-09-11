@@ -1,0 +1,70 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  background: #f4f6f5;
+  color: #1f2933;
+}
+
+.container { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+.site-header {
+  background: #14532d;
+  color: #fff;
+  padding: 14px 0;
+  margin-bottom: 28px;
+}
+.header-inner { display: flex; align-items: center; justify-content: space-between; }
+.logo { font-weight: 700; font-size: 18px; }
+nav a { color: #d1fae5; margin-left: 20px; text-decoration: none; font-size: 14px; }
+nav a:hover { color: #fff; }
+
+h1 { font-size: 22px; margin: 0 0 18px; }
+h2 { font-size: 16px; margin: 0 0 12px; }
+
+.card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.stat {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px;
+}
+.stat .label { font-size: 13px; color: #64748b; }
+.stat .value { font-size: 26px; font-weight: 700; margin-top: 6px; }
+.stat.scope-1 .value { color: #b91c1c; }
+.stat.scope-2 .value { color: #b45309; }
+.stat.scope-3 .value { color: #1d4ed8; }
+.stat.total .value { color: #14532d; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #e2e8f0; }
+th { color: #64748b; font-weight: 600; font-size: 13px; }
+
+form.entry { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; align-items: end; }
+label { display: block; font-size: 13px; color: #475569; margin-bottom: 4px; }
+input, select {
+  width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;
+}
+button {
+  background: #15803d; color: #fff; border: none; border-radius: 6px;
+  padding: 9px 18px; font-size: 14px; cursor: pointer;
+}
+button:hover { background: #166534; }
+button.danger { background: #b91c1c; padding: 4px 10px; font-size: 13px; }
+
+.error { color: #b91c1c; font-size: 14px; margin-top: 10px; }
+.muted { color: #64748b; font-size: 13px; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+.badge.s1 { background: #fee2e2; color: #b91c1c; }
+.badge.s2 { background: #fef3c7; color: #b45309; }
+.badge.s3 { background: #dbeafe; color: #1d4ed8; }
+a.export-btn {
+  display: inline-block; background: #0f766e; color: #fff; border-radius: 6px;
+  padding: 9px 18px; font-size: 14px; text-decoration: none;
+}
