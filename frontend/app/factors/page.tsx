@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { api, EmissionFactor, REGIONS } from "@/lib/api";
+import { api, EmissionFactor, FactorImpactPreview, REGIONS } from "@/lib/api";
 
 const emptyForm = {
   energy_type: "",
@@ -16,6 +16,22 @@ const emptyForm = {
   note: "",
 };
 
+type FactorPayload = Omit<EmissionFactor, "id">;
+
+const fmt = (v: number) =>
+  v.toLocaleString("zh-CN", { maximumFractionDigits: 4 });
+
+/** 排放量差值:增加红色、减少绿色、为零灰色 */
+function Delta({ value }: { value: number }) {
+  const cls = value > 0 ? "delta-up" : value < 0 ? "delta-down" : "muted";
+  return (
+    <span className={cls}>
+      {value > 0 ? "+" : ""}
+      {fmt(value)}
+    </span>
+  );
+}
+
 export default function FactorsPage() {
   const [factors, setFactors] = useState<EmissionFactor[]>([]);
   const [filterType, setFilterType] = useState("");
@@ -23,6 +39,11 @@ export default function FactorsPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  // 保存前试算:有影响记录时弹出确认,impact 非空即显示确认框
+  const [impact, setImpact] = useState<FactorImpactPreview | null>(null);
+  const [pendingPayload, setPendingPayload] = useState<FactorPayload | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const load = () => {
     api
@@ -44,7 +65,7 @@ export default function FactorsPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    const payload = {
+    const payload: FactorPayload = {
       ...form,
       scope: Number(form.scope),
       year: Number(form.year),
@@ -52,6 +73,26 @@ export default function FactorsPage() {
       source: form.source || null,
       note: form.note || null,
     };
+    // 保存前先试算:无记录受影响则直接保存,否则弹确认框
+    setPreviewing(true);
+    try {
+      const preview = await api.previewFactorImpact(editingId, payload);
+      if (preview.affected_records === 0) {
+        await save(payload);
+      } else {
+        setPendingPayload(payload);
+        setImpact(preview);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "试算失败");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const save = async (payload: FactorPayload) => {
+    setSaving(true);
+    setError("");
     try {
       if (editingId) {
         await api.updateFactor(editingId, payload);
@@ -60,10 +101,18 @@ export default function FactorsPage() {
       }
       setForm(emptyForm);
       setEditingId(null);
+      setImpact(null);
+      setPendingPayload(null);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存失败");
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const confirmSave = () => {
+    if (pendingPayload) save(pendingPayload);
   };
 
   const startEdit = (f: EmissionFactor) => {
@@ -156,11 +205,13 @@ export default function FactorsPage() {
             <input value={form.note} onChange={(e) => set("note", e.target.value)} />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button type="submit">{editingId ? "保存修改" : "新增因子"}</button>
+            <button type="submit" disabled={previewing || saving}>
+              {previewing ? "试算中…" : editingId ? "保存修改" : "新增因子"}
+            </button>
             {editingId && (
               <button
                 type="button" className="danger"
-                onClick={() => { setEditingId(null); setForm(emptyForm); }}
+                onClick={() => { setEditingId(null); setForm(emptyForm); setImpact(null); }}
               >
                 取消
               </button>
@@ -214,6 +265,86 @@ export default function FactorsPage() {
           </tbody>
         </table>
       </div>
+
+      {impact && (
+        <div className="modal-mask">
+          <div className="modal">
+            <h2>确认因子变更影响</h2>
+            <p>
+              本次变更将影响 <b>{impact.affected_records}</b> 条能耗记录,
+              这些记录的合计排放量由 <b>{fmt(impact.total_before_tco2e)}</b> tCO₂e
+              变为 <b>{fmt(impact.total_after_tco2e)}</b> tCO₂e(
+              <Delta value={impact.delta_tco2e} /> tCO₂e)。
+            </p>
+
+            {impact.by_year.length > 0 && (
+              <table style={{ marginBottom: 14 }}>
+                <thead>
+                  <tr>
+                    <th>数据年度</th><th>受影响记录</th>
+                    <th>变更前 (tCO₂e)</th><th>变更后 (tCO₂e)</th><th>差值</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {impact.by_year.map((y) => (
+                    <tr key={y.year}>
+                      <td>{y.year}</td>
+                      <td>{y.records}</td>
+                      <td>{fmt(y.before_tco2e)}</td>
+                      <td>{fmt(y.after_tco2e)}</td>
+                      <td><Delta value={y.delta_tco2e} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {impact.samples.length > 0 && (
+              <>
+                <p className="muted" style={{ marginBottom: 6 }}>
+                  受影响记录抽样(前 {impact.samples.length} 条):
+                </p>
+                <table style={{ marginBottom: 14 }}>
+                  <thead>
+                    <tr>
+                      <th>厂区</th><th>期间</th><th>能源类型</th>
+                      <th>变更前因子</th><th>变更后因子</th>
+                      <th>变更前 (tCO₂e)</th><th>变更后 (tCO₂e)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {impact.samples.map((s) => (
+                      <tr key={s.record_id}>
+                        <td>{s.facility_name}</td>
+                        <td>{s.period}</td>
+                        <td>{s.energy_type}</td>
+                        <td>{s.before_factor ?? "未匹配"}</td>
+                        <td>{s.after_factor ?? "未匹配"}</td>
+                        <td>{s.before_tco2e ?? "-"}</td>
+                        <td>{s.after_tco2e ?? "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+
+            <p className="muted">
+              确认生效后,相关历史记录将按变更后的因子重新计算排放量。
+            </p>
+            {error && <p className="error">{error}</p>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" className="ghost" disabled={saving}
+                onClick={() => { setImpact(null); setPendingPayload(null); }}>
+                返回修改
+              </button>
+              <button type="button" disabled={saving} onClick={confirmSave}>
+                {saving ? "生效中…" : "确认生效"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

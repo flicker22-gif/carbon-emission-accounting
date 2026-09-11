@@ -68,3 +68,24 @@ a.export-btn {
   display: inline-block; background: #0f766e; color: #fff; border-radius: 6px;
   padding: 9px 18px; font-size: 14px; text-decoration: none;
 }
+
+/* 因子变更影响确认弹窗 */
+.modal-mask {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, .45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50; padding: 20px;
+}
+.modal {
+  background: #fff; border-radius: 10px; padding: 24px;
+  max-width: 780px; width: 100%; max-height: 85vh; overflow: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
+}
+.modal table { font-size: 13px; }
+.modal th, .modal td { padding: 7px 8px; }
+
+button.ghost { background: #e2e8f0; color: #1f2933; }
+button.ghost:hover { background: #cbd5e1; }
+button:disabled { opacity: .6; cursor: not-allowed; }
+
+.delta-up { color: #b91c1c; font-weight: 700; }
+.delta-down { color: #15803d; font-weight: 700; }

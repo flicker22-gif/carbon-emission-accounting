@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import models, schemas
+from .. import models, schemas, services
 from ..database import get_db
 
 router = APIRouter(prefix="/api/factors", tags=["factors"])
@@ -85,6 +85,31 @@ def update_factor(factor_id: int, payload: schemas.EmissionFactorUpdate,
     db.commit()
     db.refresh(factor)
     return factor
+
+
+@router.post("/impact-preview", response_model=schemas.FactorImpactPreview)
+def preview_impact(payload: schemas.FactorImpactPreviewRequest,
+                   db: Session = Depends(get_db)):
+    """试算因子变更影响:不落库,返回受影响记录数与排放量前后对比。
+
+    与正式保存走相同的唯一键校验,避免"试算通过、保存失败"。
+    """
+    if payload.factor_id is not None and not db.get(models.EmissionFactor, payload.factor_id):
+        raise HTTPException(404, "排放因子不存在")
+    dup = db.query(models.EmissionFactor).filter_by(
+        energy_type=payload.factor.energy_type,
+        region=payload.factor.region,
+        year=payload.factor.year,
+    ).first()
+    if dup and dup.id != payload.factor_id:
+        raise HTTPException(
+            409,
+            f"已存在 {payload.factor.energy_type}/{payload.factor.region}/"
+            f"{payload.factor.year} 的因子",
+        )
+    return services.preview_factor_impact(
+        db, payload.factor_id, payload.factor.model_dump()
+    )
 
 
 @router.delete("/{factor_id}", status_code=204)

@@ -76,6 +76,32 @@ export interface ReportSummary {
   }[];
 }
 
+/** 因子变更影响试算结果(保存前预览,不落库) */
+export interface FactorImpactPreview {
+  affected_records: number;
+  total_before_tco2e: number;
+  total_after_tco2e: number;
+  delta_tco2e: number;
+  by_year: {
+    year: number;
+    records: number;
+    before_tco2e: number;
+    after_tco2e: number;
+    delta_tco2e: number;
+  }[];
+  samples: {
+    record_id: number;
+    facility_name: string;
+    period: string;
+    energy_type: string;
+    consumption: number;
+    before_factor?: string | null;
+    before_tco2e?: number | null;
+    after_factor?: string | null;
+    after_tco2e?: number | null;
+  }[];
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -107,6 +133,12 @@ export const api = {
   deleteFactor: (id: number) =>
     fetch(`${API_BASE}/api/factors/${id}`, { method: "DELETE" }),
   listEnergyTypes: () => request<EnergyType[]>("/api/factors/energy-types"),
+  /** 保存前试算:factorId 为 null 表示新增因子 */
+  previewFactorImpact: (factorId: number | null, factor: Omit<EmissionFactor, "id">) =>
+    request<FactorImpactPreview>("/api/factors/impact-preview", {
+      method: "POST",
+      body: JSON.stringify({ factor_id: factorId, factor }),
+    }),
 
   listRecords: () => request<EnergyRecord[]>("/api/records"),
   createRecord: (data: {

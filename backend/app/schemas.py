@@ -59,6 +59,49 @@ class EnergyTypeOut(BaseModel):
     unit: str
 
 
+# ---------- 因子变更影响试算 ----------
+class FactorImpactPreviewRequest(BaseModel):
+    """保存因子前的试算请求。factor_id 为 None 表示新增因子,否则表示编辑该因子。"""
+
+    factor_id: int | None = None
+    factor: EmissionFactorCreate
+
+
+class FactorImpactYear(BaseModel):
+    """按数据年度分解的受影响情况"""
+
+    year: int
+    records: int
+    before_tco2e: float
+    after_tco2e: float
+    delta_tco2e: float
+
+
+class FactorImpactRecord(BaseModel):
+    """受影响记录明细(试算结果中仅返回前若干条抽样)"""
+
+    record_id: int
+    facility_name: str
+    period: str
+    energy_type: str
+    consumption: float
+    before_factor: str | None
+    before_tco2e: float | None
+    after_factor: str | None
+    after_tco2e: float | None
+
+
+class FactorImpactPreview(BaseModel):
+    """试算结果:不落库,仅模拟应用变更后重算并对比"""
+
+    affected_records: int
+    total_before_tco2e: float
+    total_after_tco2e: float
+    delta_tco2e: float
+    by_year: list[FactorImpactYear]
+    samples: list[FactorImpactRecord]
+
+
 # ---------- 能耗记录 ----------
 class EnergyRecordCreate(BaseModel):
     facility_id: int
