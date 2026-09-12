@@ -33,6 +33,7 @@ class EmissionFactorCreate(BaseModel):
 
 
 class EmissionFactorUpdate(BaseModel):
+    energy_type: str | None = None
     name_zh: str | None = None
     scope: int | None = Field(default=None, ge=1, le=3)
     category: str | None = None
