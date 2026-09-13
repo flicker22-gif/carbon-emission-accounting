@@ -102,6 +102,21 @@ export interface FactorImpactPreview {
   }[];
 }
 
+/** 把 FastAPI 错误响应(字符串 detail 或 422 校验错误数组)拼成可读信息 */
+function errorMessage(body: unknown, status: number): string {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail.map((d) => {
+      const loc = Array.isArray(d?.loc) ? d.loc.filter((x: unknown) => x !== "body") : [];
+      const msg = String(d?.msg ?? "").replace(/^Value error, /, "");
+      return loc.length ? `${loc.join(".")}: ${msg}` : msg;
+    }).filter(Boolean);
+    if (parts.length) return parts.join(";");
+  }
+  return `请求失败 (${status})`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -109,7 +124,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(body?.detail ?? `请求失败 (${res.status})`);
+    throw new Error(errorMessage(body, res.status));
   }
   return res.json();
 }

@@ -1,6 +1,17 @@
 from datetime import datetime
+from typing import Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+
+def reject_null_required(model: BaseModel, fields: tuple[str, ...]) -> None:
+    """更新接口专用:必填字段显式传 null 报参数错误(区别于"未传 = 不修改")。
+
+    若放行至数据库层,非空列会被写入 NULL 而抛 IntegrityError(500)。
+    """
+    nulls = [f for f in fields if f in model.model_fields_set and getattr(model, f) is None]
+    if nulls:
+        raise ValueError(f"必填字段不能为 null: {', '.join(nulls)}")
 
 
 # ---------- 厂区 ----------
@@ -43,6 +54,13 @@ class EmissionFactorUpdate(BaseModel):
     year: int | None = Field(default=None, ge=1990, le=2100)
     source: str | None = None
     note: str | None = None
+
+    @model_validator(mode="after")
+    def _check_nulls(self) -> Self:
+        # source/note 为可空字段,显式传 null 表示清空,不在此列
+        reject_null_required(self, ("energy_type", "name_zh", "scope", "category",
+                                    "unit", "factor_value", "region", "year"))
+        return self
 
 
 class EmissionFactorOut(EmissionFactorCreate):
@@ -119,6 +137,12 @@ class EnergyRecordUpdate(BaseModel):
                                description="YYYY-MM")
     consumption: float | None = Field(default=None, gt=0)
     remark: str | None = None
+
+    @model_validator(mode="after")
+    def _check_nulls(self) -> Self:
+        # remark 可空,显式传 null 表示清空
+        reject_null_required(self, ("period", "consumption"))
+        return self
 
 
 class EnergyRecordOut(BaseModel):
