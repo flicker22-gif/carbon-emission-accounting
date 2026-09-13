@@ -79,6 +79,21 @@ def create_record(payload: schemas.EnergyRecordCreate, db: Session = Depends(get
     return to_out(record, factor)
 
 
+@router.put("/{record_id}", response_model=schemas.EnergyRecordOut)
+def update_record(record_id: int, payload: schemas.EnergyRecordUpdate,
+                  db: Session = Depends(get_db)):
+    """修正已有记录的月份/消耗量/备注,排放量按当前因子重新匹配计算"""
+    record = db.get(models.EnergyRecord, record_id)
+    if not record:
+        raise HTTPException(404, "记录不存在")
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(record, key, value)
+    db.commit()
+    db.refresh(record)
+    factor = services.factor_for_record(services.load_all_factors(db), record)
+    return to_out(record, factor)
+
+
 @router.delete("/{record_id}", status_code=204)
 def delete_record(record_id: int, db: Session = Depends(get_db)):
     record = db.get(models.EnergyRecord, record_id)

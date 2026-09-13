@@ -14,6 +14,8 @@ export default function RecordsPage() {
   const [period, setPeriod] = useState("");
   const [consumption, setConsumption] = useState("");
   const [remark, setRemark] = useState("");
+  // 编辑已有记录:非 null 时表单进入编辑模式,仅月份/消耗量/备注可改
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const load = () => {
     Promise.all([api.listFacilities(), api.listEnergyTypes(), api.listRecords()])
@@ -34,19 +36,44 @@ export default function RecordsPage() {
     e.preventDefault();
     setError("");
     try {
-      await api.createRecord({
-        facility_id: Number(facilityId),
-        energy_type: energyType,
-        period,
-        consumption: Number(consumption),
-        remark: remark || undefined,
-      });
+      if (editingId) {
+        await api.updateRecord(editingId, {
+          period,
+          consumption: Number(consumption),
+          remark: remark || null,
+        });
+        setEditingId(null);
+      } else {
+        await api.createRecord({
+          facility_id: Number(facilityId),
+          energy_type: energyType,
+          period,
+          consumption: Number(consumption),
+          remark: remark || undefined,
+        });
+      }
       setConsumption("");
       setRemark("");
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "提交失败");
     }
+  };
+
+  const startEdit = (r: EnergyRecord) => {
+    setEditingId(r.id);
+    setFacilityId(String(r.facility_id));
+    setEnergyType(r.energy_type);
+    setPeriod(r.period);
+    setConsumption(String(r.consumption));
+    setRemark(r.remark ?? "");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setConsumption("");
+    setRemark("");
   };
 
   const remove = async (id: number) => {
@@ -59,10 +86,11 @@ export default function RecordsPage() {
       <h1>能耗数据录入</h1>
 
       <div className="card">
+        {editingId && <h2>编辑记录 #{editingId}</h2>}
         <form className="entry" onSubmit={submit}>
           <div>
             <label>厂区</label>
-            <select required value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
+            <select required disabled={!!editingId} value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
               <option value="">请选择</option>
               {facilities.map((f) => (
                 <option key={f.id} value={f.id}>{f.name}（{f.region}）</option>
@@ -71,7 +99,7 @@ export default function RecordsPage() {
           </div>
           <div>
             <label>能源类型</label>
-            <select required value={energyType} onChange={(e) => setEnergyType(e.target.value)}>
+            <select required disabled={!!editingId} value={energyType} onChange={(e) => setEnergyType(e.target.value)}>
               <option value="">请选择</option>
               {energyTypes.map((t) => (
                 <option key={t.energy_type} value={t.energy_type}>
@@ -95,14 +123,23 @@ export default function RecordsPage() {
             <label>备注</label>
             <input value={remark} onChange={(e) => setRemark(e.target.value)} />
           </div>
-          <div>
-            <button type="submit">保存记录</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="submit">{editingId ? "保存修改" : "保存记录"}</button>
+            {editingId && (
+              <button type="button" className="danger" onClick={cancelEdit}>取消</button>
+            )}
           </div>
         </form>
-        {selectedType && selectedFacility && (
+        {editingId ? (
           <p className="muted" style={{ marginBottom: 0 }}>
-            将按「{selectedFacility.region} → 全国」优先、年度 ≤ 数据期间最新的规则自动匹配排放因子。
+            仅可修改月份、消耗量和备注;厂区与能源类型不可改。保存后排放量按当前因子自动重算,其他记录不受影响。
           </p>
+        ) : (
+          selectedType && selectedFacility && (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              将按「{selectedFacility.region} → 全国」优先、年度 ≤ 数据期间最新的规则自动匹配排放因子。
+            </p>
+          )
         )}
         {error && <p className="error">{error}</p>}
       </div>
@@ -134,7 +171,8 @@ export default function RecordsPage() {
                     : "因子库无适用因子"}
                 </td>
                 <td>{r.emissions_tco2e != null ? r.emissions_tco2e.toLocaleString() : "-"}</td>
-                <td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <button className="danger" style={{ background: "#0f766e", marginRight: 6 }} onClick={() => startEdit(r)}>编辑</button>
                   <button className="danger" onClick={() => remove(r.id)}>删除</button>
                 </td>
               </tr>

@@ -149,6 +149,12 @@ export const api = {
     remark?: string;
   }) =>
     request<EnergyRecord>("/api/records", { method: "POST", body: JSON.stringify(data) }),
+  updateRecord: (id: number, data: {
+    period?: string;
+    consumption?: number;
+    remark?: string | null;
+  }) =>
+    request<EnergyRecord>(`/api/records/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteRecord: (id: number) =>
     fetch(`${API_BASE}/api/records/${id}`, { method: "DELETE" }),
 

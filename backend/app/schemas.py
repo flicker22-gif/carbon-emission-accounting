@@ -112,6 +112,15 @@ class EnergyRecordCreate(BaseModel):
     remark: str | None = None
 
 
+class EnergyRecordUpdate(BaseModel):
+    """已录入记录可修正的字段:月份/消耗量/备注;厂区与能源类型不可改"""
+
+    period: str | None = Field(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$",
+                               description="YYYY-MM")
+    consumption: float | None = Field(default=None, gt=0)
+    remark: str | None = None
+
+
 class EnergyRecordOut(BaseModel):
     id: int
     facility_id: int
