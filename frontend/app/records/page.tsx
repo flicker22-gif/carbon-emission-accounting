@@ -84,6 +84,10 @@ export default function RecordsPage() {
   return (
     <>
       <h1>能耗数据录入</h1>
+      <p className="muted">
+        单条手工录入适用于补录;各厂区整份月度能耗表请在「批量导入」上传,
+        批次确认后的记录(🔒)已锁定,需整批退回后修订。
+      </p>
 
       <div className="card">
         {editingId && <h2>编辑记录 #{editingId}</h2>}
@@ -172,8 +176,14 @@ export default function RecordsPage() {
                 </td>
                 <td>{r.emissions_tco2e != null ? r.emissions_tco2e.toLocaleString() : "-"}</td>
                 <td style={{ whiteSpace: "nowrap" }}>
-                  <button className="danger" style={{ background: "#0f766e", marginRight: 6 }} onClick={() => startEdit(r)}>编辑</button>
-                  <button className="danger" onClick={() => remove(r.id)}>删除</button>
+                  {r.batch_id != null ? (
+                    <span className="muted" title="批量导入确认生成,已随批次锁定">🔒 批次 #{r.batch_id}</span>
+                  ) : (
+                    <>
+                      <button className="danger" style={{ background: "#0f766e", marginRight: 6 }} onClick={() => startEdit(r)}>编辑</button>
+                      <button className="danger" onClick={() => remove(r.id)}>删除</button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

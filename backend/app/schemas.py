@@ -155,6 +155,7 @@ class EnergyRecordOut(BaseModel):
     consumption: float
     remark: str | None
     created_at: datetime
+    batch_id: int | None = None  # 非空=批次导入且已锁定,不可单条编辑/删除
     # 以下为动态匹配到的因子信息;未匹配到时为 None
     matched: bool
     factor_id: int | None
@@ -168,6 +169,86 @@ class EnergyRecordOut(BaseModel):
     emissions_tco2e: float | None
 
     model_config = {"from_attributes": True}
+
+
+# ---------- 批量导入 ----------
+class RowFieldError(BaseModel):
+    field: str  # 出错的 CSV 列名(中文),整行级错误为 "__row__"
+    message: str
+
+
+class BatchRowOut(BaseModel):
+    """批次内的一行(合法行带因子匹配结果;错误行带原始单元格与逐字段错误)"""
+
+    id: int
+    row_number: int
+    is_valid: bool
+    facility_id: int | None
+    facility_code: str
+    facility_name: str
+    facility_region: str | None
+    energy_type: str
+    period: str
+    consumption: float | None
+    remark: str | None
+    errors: list[RowFieldError]
+    raw_data: dict[str, str]
+    matched: bool
+    factor_id: int | None
+    factor_name: str | None
+    factor_value: float | None
+    factor_region: str | None
+    factor_year: int | None
+    scope: int | None
+    category: str | None
+    unit: str | None
+    emissions_tco2e: float | None
+
+    model_config = {"from_attributes": True}
+
+
+class BatchOut(BaseModel):
+    id: int
+    filename: str
+    content_hash: str
+    status: str
+    total_rows: int
+    valid_rows: int
+    error_rows: int
+    impact_tco2e: float  # 合法行确认后的汇总影响(未匹配行不计)
+    unmatched_valid_rows: int  # 合法但未匹配到因子的行数(可追踪,不计排放)
+    review_note: str | None
+    created_at: datetime
+    confirmed_at: datetime | None
+    rejected_at: datetime | None
+    # 仅在详情接口返回
+    rows: list[BatchRowOut] | None = None
+    # 重复上传同一内容时返回已存在批次的 id,方便前端直接跳转复核
+    duplicate_of_batch_id: int | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class BatchSummaryOut(BaseModel):
+    """批次列表项:不含行明细"""
+
+    id: int
+    filename: str
+    status: str
+    total_rows: int
+    valid_rows: int
+    error_rows: int
+    impact_tco2e: float
+    unmatched_valid_rows: int
+    created_at: datetime
+    confirmed_at: datetime | None
+    rejected_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class BatchReviewAction(BaseModel):
+    review_note: str | None = None
 
 
 # ---------- 报表 ----------
@@ -193,7 +274,8 @@ class ReportSummary(BaseModel):
     period_from: str | None
     period_to: str | None
     total_tco2e: float
-    unmatched_records: int  # 未匹配到因子、未计入汇总的记录数
+    unmatched_records: int  # 已确认记录中未匹配到因子、未计入汇总的记录数
+    pending_batches: int  # 待确认批次数(其数据尚未计入汇总)
     by_scope: list[ScopeSummary]
     by_category: list[CategorySummary]
     by_facility: list[FacilitySummary]

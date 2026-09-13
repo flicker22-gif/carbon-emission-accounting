@@ -49,6 +49,7 @@ export interface EnergyRecord {
   consumption: number;
   remark?: string | null;
   created_at: string;
+  batch_id?: number | null;
   matched: boolean;
   factor_id?: number | null;
   factor_name?: string | null;
@@ -66,6 +67,7 @@ export interface ReportSummary {
   period_to?: string | null;
   total_tco2e: number;
   unmatched_records: number;
+  pending_batches: number;
   by_scope: { scope: number; emissions_tco2e: number }[];
   by_category: { scope: number; category: string; emissions_tco2e: number }[];
   by_facility: {
@@ -74,6 +76,70 @@ export interface ReportSummary {
     scope: number;
     emissions_tco2e: number;
   }[];
+}
+
+export type BatchStatus = "pending" | "confirmed" | "rejected";
+
+export interface RowFieldError {
+  field: string;
+  message: string;
+}
+
+export interface BatchRow {
+  id: number;
+  row_number: number;
+  is_valid: boolean;
+  facility_id?: number | null;
+  facility_code: string;
+  facility_name: string;
+  facility_region?: string | null;
+  energy_type: string;
+  period: string;
+  consumption?: number | null;
+  remark?: string | null;
+  errors: RowFieldError[];
+  raw_data: Record<string, string>;
+  matched: boolean;
+  factor_id?: number | null;
+  factor_name?: string | null;
+  factor_value?: number | null;
+  factor_region?: string | null;
+  factor_year?: number | null;
+  scope?: number | null;
+  category?: string | null;
+  unit?: string | null;
+  emissions_tco2e?: number | null;
+}
+
+export interface Batch {
+  id: number;
+  filename: string;
+  content_hash: string;
+  status: BatchStatus;
+  total_rows: number;
+  valid_rows: number;
+  error_rows: number;
+  impact_tco2e: number;
+  unmatched_valid_rows: number;
+  review_note?: string | null;
+  created_at: string;
+  confirmed_at?: string | null;
+  rejected_at?: string | null;
+  rows?: BatchRow[] | null;
+}
+
+export interface BatchSummary {
+  id: number;
+  filename: string;
+  status: BatchStatus;
+  total_rows: number;
+  valid_rows: number;
+  error_rows: number;
+  impact_tco2e: number;
+  unmatched_valid_rows: number;
+  created_at: string;
+  confirmed_at?: string | null;
+  rejected_at?: string | null;
 }
 
 /** 因子变更影响试算结果(保存前预览,不落库) */
@@ -118,8 +184,10 @@ function errorMessage(body: unknown, status: number): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isForm = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    // FormData 由浏览器自动设置含 boundary 的 Content-Type,不能手动指定
+    headers: isForm ? undefined : { "Content-Type": "application/json" },
     ...init,
   });
   if (!res.ok) {
@@ -174,4 +242,32 @@ export const api = {
     fetch(`${API_BASE}/api/records/${id}`, { method: "DELETE" }),
 
   summary: () => request<ReportSummary>("/api/reports/summary"),
+
+  // ---------- 批量导入批次 ----------
+  listBatches: (status?: BatchStatus) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request<BatchSummary[]>(`/api/batches${qs}`);
+  },
+  getBatch: (id: number) => request<Batch>(`/api/batches/${id}`),
+  importBatch: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<Batch>("/api/batches/import", { method: "POST", body: form });
+  },
+  confirmBatch: (id: number, reviewNote?: string) =>
+    request<Batch>(`/api/batches/${id}/confirm`, {
+      method: "POST",
+      body: JSON.stringify({ review_note: reviewNote ?? null }),
+    }),
+  rejectBatch: (id: number, reviewNote?: string) =>
+    request<Batch>(`/api/batches/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ review_note: reviewNote ?? null }),
+    }),
+  returnBatch: (id: number, reviewNote?: string) =>
+    request<Batch>(`/api/batches/${id}/return`, {
+      method: "POST",
+      body: JSON.stringify({ review_note: reviewNote ?? null }),
+    }),
+  templateUrl: () => `${API_BASE}/api/batches/template.csv`,
 };

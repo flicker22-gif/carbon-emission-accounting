@@ -16,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span className="logo">🌱 碳排放核算</span>
             <nav>
               <Link href="/">仪表盘</Link>
+              <Link href="/batches">批量导入</Link>
               <Link href="/records">数据录入</Link>
               <Link href="/facilities">厂区管理</Link>
               <Link href="/factors">排放因子</Link>

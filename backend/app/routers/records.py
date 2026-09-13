@@ -20,6 +20,7 @@ def to_out(record: models.EnergyRecord, factor: models.EmissionFactor | None,
         consumption=record.consumption,
         remark=record.remark,
         created_at=record.created_at,
+        batch_id=record.batch_id,
         matched=factor is not None,
         factor_id=factor.id if factor else None,
         factor_name=factor.name_zh if factor else None,
@@ -82,10 +83,16 @@ def create_record(payload: schemas.EnergyRecordCreate, db: Session = Depends(get
 @router.put("/{record_id}", response_model=schemas.EnergyRecordOut)
 def update_record(record_id: int, payload: schemas.EnergyRecordUpdate,
                   db: Session = Depends(get_db)):
-    """修正已有记录的月份/消耗量/备注,排放量按当前因子重新匹配计算"""
+    """修正已有记录的月份/消耗量/备注,排放量按当前因子重新匹配计算。
+
+    批次导入并确认的记录已随批次锁定,只能整批退回后修订,不能单条修改。
+    """
     record = db.get(models.EnergyRecord, record_id)
     if not record:
         raise HTTPException(404, "记录不存在")
+    if record.batch_id is not None:
+        raise HTTPException(409, f"该记录由导入批次 #{record.batch_id} 确认生成,已锁定;"
+                                "请在「批量导入」中整批退回后修订")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(record, key, value)
     db.commit()
@@ -99,5 +106,8 @@ def delete_record(record_id: int, db: Session = Depends(get_db)):
     record = db.get(models.EnergyRecord, record_id)
     if not record:
         raise HTTPException(404, "记录不存在")
+    if record.batch_id is not None:
+        raise HTTPException(409, f"该记录由导入批次 #{record.batch_id} 确认生成,已锁定;"
+                                "不能单条删除,请使用整批退回")
     db.delete(record)
     db.commit()

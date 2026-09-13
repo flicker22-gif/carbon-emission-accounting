@@ -58,6 +58,10 @@ def summary(
         period_to=period_to,
         total_tco2e=round(sum(by_scope.values()), 4),
         unmatched_records=unmatched,
+        # 待确认批次的数据尚未进入 energy_records,不会计入本汇总
+        pending_batches=db.query(models.ImportBatch).filter_by(
+            status=models.BATCH_PENDING
+        ).count(),
         by_scope=[schemas.ScopeSummary(scope=s, emissions_tco2e=round(v, 4))
                   for s, v in sorted(by_scope.items())],
         by_category=[schemas.CategorySummary(scope=s, category=c, emissions_tco2e=round(v, 4))

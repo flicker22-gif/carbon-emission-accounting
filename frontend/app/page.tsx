@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, API_BASE, ReportSummary } from "@/lib/api";
 
@@ -26,6 +27,12 @@ export default function Dashboard() {
   return (
     <>
       <h1>排放总览</h1>
+      {data.pending_batches > 0 && (
+        <p className="error">
+          ⏳ 有 {data.pending_batches} 个待确认导入批次尚未计入本页汇总与 CSV 导出,
+          请前往 <Link href="/batches">批量导入</Link> 复核确认或驳回。
+        </p>
+      )}
       {data.unmatched_records > 0 && (
         <p className="error">
           ⚠️ 有 {data.unmatched_records} 条记录未匹配到适用排放因子,未计入汇总。请在「排放因子」中补充对应地区/年度的因子。
